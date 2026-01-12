@@ -14,6 +14,7 @@ import { modelsRoute } from './routes/models.js';
 import type { ServerConfig } from './types.js';
 
 import { loggerPlugin } from './plugins/logger.js';
+import { authPlugin } from './plugins/auth.js';
 
 export async function createServer(
   config: Partial<ServerConfig> = {},
@@ -24,6 +25,9 @@ export async function createServer(
 
   // Register Logger Plugin (Custom request/response logging)
   await fastify.register(loggerPlugin);
+
+  // Register Auth Plugin (Consumer API key validation)
+  await fastify.register(authPlugin);
 
   // Register CORS
   const corsOrigins = process.env['CORS_ORIGINS'];
@@ -54,6 +58,18 @@ export async function createServer(
         { name: 'chat', description: 'Chat completions endpoints' },
         { name: 'models', description: 'Model management endpoints' },
       ],
+      components: {
+        securitySchemes: {
+          bearerAuth: {
+            type: 'http',
+            scheme: 'bearer',
+            bearerFormat: 'API Key',
+            description:
+              'Consumer API key. Set PROXY_API_KEY env var to enable.',
+          },
+        },
+      },
+      security: [{ bearerAuth: [] }],
     },
   });
 

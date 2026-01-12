@@ -1,0 +1,100 @@
+# syntax=docker/dockerfile:1.4
+# Gemini CLI Proxy Server - VPS Deployment
+#
+# This Dockerfile uses BuildKit secrets to securely inject OAuth credentials
+# without baking them into intermediate image layers.
+#
+# Build with:
+#   DOCKER_BUILDKIT=1 docker build \
+#     --secret id=gemini,src=$HOME/.gemini \
+#     -f packages/proxy-server/deploy/docker/Dockerfile.vps \
+#     -t gemini-proxy:vps .
+
+FROM node:20-slim AS builder
+
+WORKDIR /build
+
+# Copy root workspace files
+COPY package.json package-lock.json tsconfig.json ./
+COPY scripts scripts/
+
+# Copy packages
+COPY packages/core packages/core
+COPY packages/test-utils packages/test-utils
+COPY packages/proxy-server packages/proxy-server
+
+# Install all deps (including devDeps for build)
+RUN npm ci --ignore-scripts
+
+# Build packages in order
+RUN npm run build --workspace=@google/gemini-cli-core
+RUN npm run build --workspace=@google/gemini-cli-proxy-server
+
+# ============================================
+# Production image
+# ============================================
+FROM node:20-slim AS production
+
+LABEL org.opencontainers.image.title="Gemini CLI Proxy Server (VPS)"
+LABEL org.opencontainers.image.description="Self-contained VPS deployment with embedded credentials"
+
+WORKDIR /app
+
+# Create non-root user for security
+RUN groupadd -r gemini && useradd -r -g gemini -d /home/gemini -m gemini
+
+# Copy built artifacts from builder
+COPY --chown=gemini:gemini --from=builder /build/packages/core/dist packages/core/dist
+COPY --chown=gemini:gemini --from=builder /build/packages/core/package.json packages/core/
+
+COPY --chown=gemini:gemini --from=builder /build/packages/proxy-server/dist packages/proxy-server/dist
+COPY --chown=gemini:gemini --from=builder /build/packages/proxy-server/package.json packages/proxy-server/
+
+# Copy root package files for workspace resolution
+COPY --chown=gemini:gemini --from=builder /build/package.json /build/package-lock.json ./
+
+# Install production dependencies only
+RUN npm ci --omit=dev --workspace=@google/gemini-cli-proxy-server --ignore-scripts \
+  && npm cache clean --force
+
+# WORKAROUND: Pack and install core locally to avoid Docker symlink resolution issues
+RUN cd packages/core && npm pack && cd ../.. \
+  && npm install --omit=dev --no-save packages/core/google-gemini-cli-core-*.tgz --workspace=@google/gemini-cli-proxy-server
+
+# Ensure all files are world-readable and directories are traversable
+RUN chmod -R a+rX /app
+
+# Create .gemini directory for OAuth tokens
+RUN mkdir -p /home/gemini/.gemini && chown -R gemini:gemini /home/gemini
+
+# ============================================
+# INJECT CREDENTIALS VIA BUILDKIT SECRET
+# ============================================
+# This copies credentials from the BuildKit secret mount.
+# The secret is NOT stored in image layers - only the final COPY persists.
+RUN --mount=type=secret,id=gemini,target=/run/secrets/gemini \
+  if [ -d /run/secrets/gemini ]; then \
+  cp -r /run/secrets/gemini/* /home/gemini/.gemini/ 2>/dev/null || true; \
+  chown -R gemini:gemini /home/gemini/.gemini; \
+  chmod 600 /home/gemini/.gemini/* 2>/dev/null || true; \
+  echo "✅ Credentials injected from BuildKit secret"; \
+  else \
+  echo "⚠️  No credentials secret provided - using API key or runtime mount"; \
+  fi
+
+# Switch to non-root user
+USER gemini
+
+# Environment defaults
+ENV NODE_ENV=production
+ENV HOME=/home/gemini
+ENV PORT=3000
+ENV HOST=0.0.0.0
+
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD node -e "fetch('http://localhost:3000/v1/models').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
+
+CMD ["node", "packages/proxy-server/dist/server.js"]

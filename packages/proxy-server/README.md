@@ -97,6 +97,26 @@ For running within Google Cloud environment (Cloud Run, GKE, Compute Engine).
     ```
 2.  The server will use the environment's default service account credentials.
 
+### 4. Consumer API Key (For Your Clients)
+
+If you want to protect your proxy from unauthorized access, set `PROXY_API_KEY`:
+
+```bash
+export PROXY_API_KEY="your-secret-consumer-key"
+```
+
+Clients must then include the key in requests:
+
+```bash
+curl http://localhost:3000/v1/chat/completions \
+  -H "Authorization: Bearer your-secret-consumer-key" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "gemini-1.5-flash", "messages": [...]}'
+```
+
+> [!NOTE] If `PROXY_API_KEY` is not set, the proxy runs in open mode (no client
+> auth required).
+
 ---
 
 ## 🐳 Deployment (Docker)

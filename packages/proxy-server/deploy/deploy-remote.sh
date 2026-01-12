@@ -53,6 +53,7 @@ ssh "$REMOTE_HOST" "
   # Run new
   docker run -d \
     -p $REMOTE_PORT:3000 \
+    -e PROXY_API_KEY="${PROXY_API_KEY}" \
     -v $REMOTE_AUTH_DIR:/home/gemini/.gemini \
     --restart unless-stopped \
     --name gemini-proxy \

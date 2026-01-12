@@ -24,6 +24,8 @@ services:
       # Auth: Choose ONE method
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-}
+      # Consumer Auth
+      - PROXY_API_KEY=${PROXY_API_KEY:-}
       # Optional settings
       - CORS_ORIGINS=${CORS_ORIGINS:-*}
       - INCLUDE_THINKING=${INCLUDE_THINKING:-true}

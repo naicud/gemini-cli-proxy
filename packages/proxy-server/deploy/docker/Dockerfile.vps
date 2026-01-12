@@ -88,7 +88,7 @@ USER gemini
 # Environment defaults
 ENV NODE_ENV=production
 ENV HOME=/home/gemini
-ENV PORT=3000
+ENV PORT=3008
 ENV HOST=0.0.0.0
 
 EXPOSE 3000

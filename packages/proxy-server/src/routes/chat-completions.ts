@@ -340,21 +340,46 @@ export const chatCompletionsRoute: FastifyPluginAsync<RouteOptions> = async (
           // Non-streaming response - collect all chunks
           const chunks: OpenAI.ChatCompletionChunk[] = [];
           let usage: OpenAI.CompletionUsage | undefined;
+          let streamError: Error | null = null;
 
-          for await (const event of geminiToOpenAIStream(
-            geminiStream,
-            body.model,
-            includeThinking,
-          )) {
-            if (typeof event.data !== 'string') {
-              const chunk = event.data as OpenAI.ChatCompletionChunk & {
-                usage?: OpenAI.CompletionUsage;
-              };
-              if (chunk.usage) {
-                usage = chunk.usage;
+          try {
+            for await (const event of geminiToOpenAIStream(
+              geminiStream,
+              body.model,
+              includeThinking,
+            )) {
+              if (typeof event.data !== 'string') {
+                const chunk = event.data as OpenAI.ChatCompletionChunk & {
+                  usage?: OpenAI.CompletionUsage;
+                };
+                if (chunk.usage) {
+                  usage = chunk.usage;
+                }
+                chunks.push(chunk);
               }
-              chunks.push(chunk);
             }
+          } catch (err) {
+            // Capture stream error to propagate it properly
+            streamError = err instanceof Error ? err : new Error(String(err));
+            request.log.error(streamError, 'Error during Gemini stream');
+          }
+
+          // If we got an error from the stream, re-throw it
+          if (streamError) {
+            throw streamError;
+          }
+
+          // Check if we actually got any content from the stream
+          // (prevents returning null content when API fails silently)
+          const hasContent = chunks.some(
+            (c) =>
+              c.choices[0]?.delta?.content ||
+              c.choices[0]?.delta?.tool_calls?.length,
+          );
+          if (!hasContent && chunks.length <= 1) {
+            throw new Error(
+              'No content received from the model. The request may have been rejected.',
+            );
           }
 
           const response = buildNonStreamingResponse(chunks, body.model, usage);
@@ -362,14 +387,8 @@ export const chatCompletionsRoute: FastifyPluginAsync<RouteOptions> = async (
         }
       } catch (error) {
         request.log.error(error, 'Error processing chat completion');
-        return reply.status(500).send({
-          error: {
-            message:
-              error instanceof Error ? error.message : 'Internal server error',
-            type: 'api_error',
-            code: 'internal_error',
-          },
-        });
+        // Re-throw to let the global error handler format the response
+        throw error;
       }
     },
   );

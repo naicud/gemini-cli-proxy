@@ -17,9 +17,9 @@ services:
       dockerfile: packages/proxy-server/deploy/docker/Dockerfile
     image: gemini-proxy:latest
     ports:
-      - "${PORT:-3000}:3000"
+      - '${PORT:-3008}:3008'
     environment:
-      - PORT=3000
+      - PORT=3008
       - HOST=0.0.0.0
       # Auth: Choose ONE method
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
@@ -41,8 +41,6 @@ services:
     profiles:
       - oauth
     ports:
-      - "${PORT:-3000}:3000"
+      - '${PORT:-3008}:3008'
     volumes:
       - ~/.gemini:/home/gemini/.gemini
-
-

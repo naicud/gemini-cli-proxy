@@ -15,6 +15,7 @@ import type { ServerConfig } from './types.js';
 
 import { loggerPlugin } from './plugins/logger.js';
 import { authPlugin } from './plugins/auth.js';
+import { errorHandlerPlugin } from './plugins/error-handler.js';
 
 export async function createServer(
   config: Partial<ServerConfig> = {},
@@ -28,6 +29,9 @@ export async function createServer(
 
   // Register Auth Plugin (Consumer API key validation)
   await fastify.register(authPlugin);
+
+  // Register Error Handler Plugin (OpenAI-compatible error responses)
+  await fastify.register(errorHandlerPlugin);
 
   // Register CORS
   const corsOrigins = process.env['CORS_ORIGINS'];

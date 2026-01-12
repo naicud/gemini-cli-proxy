@@ -23,9 +23,11 @@ export async function openaiToGemini(
 ): Promise<{
   systemInstruction: string | undefined;
   contents: Content[];
+  toolCallMap: Map<string, string>;
 }> {
   let systemInstruction: string | undefined;
   const contents: Content[] = [];
+  const toolCallMap = new Map<string, string>();
 
   for (const message of messages) {
     if (message.role === 'system') {
@@ -51,6 +53,8 @@ export async function openaiToGemini(
       if (message.tool_calls) {
         for (const toolCall of message.tool_calls) {
           if (toolCall.type === 'function') {
+            // Track mapping of tool_call_id → function name for later tool responses
+            toolCallMap.set(toolCall.id, toolCall.function.name);
             parts.push({
               functionCall: {
                 name: toolCall.function.name,
@@ -71,12 +75,15 @@ export async function openaiToGemini(
     }
 
     if (message.role === 'tool') {
+      // Use the actual function name from the mapping, falling back to tool_call_id
+      const functionName =
+        toolCallMap.get(message.tool_call_id) ?? message.tool_call_id;
       contents.push({
         role: 'user',
         parts: [
           {
             functionResponse: {
-              name: message.tool_call_id,
+              name: functionName,
               response: { result: message.content },
             },
           },
@@ -85,7 +92,7 @@ export async function openaiToGemini(
     }
   }
 
-  return { systemInstruction, contents };
+  return { systemInstruction, contents, toolCallMap };
 }
 
 /**

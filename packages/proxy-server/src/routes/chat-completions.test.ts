@@ -16,9 +16,10 @@ vi.mock('../session/session-manager.js', () => ({
     getOrCreate = async () => ({
       id: 'test-session-id',
       client: {
-        async *sendMessageStream () {
+        async *sendMessageStream() {
           yield { type: GeminiEventType.Content, value: 'Test response' };
         },
+        setHistory: vi.fn(),
       },
       config: {},
       createdAt: new Date(),

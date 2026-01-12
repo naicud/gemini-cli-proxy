@@ -23,19 +23,24 @@ export async function* geminiToOpenAIStream(
   const id = `chatcmpl-${uuid()}`;
   const created = Math.floor(Date.now() / 1000);
   let isFirstChunk = true;
+  let toolCallIndex = 0;
 
   for await (const event of geminiStream) {
-    const chunk = processEvent(
+    const result = processEvent(
       event,
       id,
       created,
       model,
       isFirstChunk,
       includeThinking,
+      toolCallIndex,
     );
-    if (chunk) {
-      yield { data: chunk };
+    if (result !== null) {
+      yield { data: result.chunk };
       isFirstChunk = false;
+      if (result.isToolCall) {
+        toolCallIndex++;
+      }
     }
   }
 
@@ -58,6 +63,11 @@ export async function* geminiToOpenAIStream(
   yield { data: '[DONE]' };
 }
 
+interface ProcessEventResult {
+  readonly chunk: ChatCompletionChunk;
+  readonly isToolCall: boolean;
+}
+
 function processEvent(
   event: ServerGeminiStreamEvent,
   id: string,
@@ -65,10 +75,13 @@ function processEvent(
   model: string,
   isFirstChunk: boolean,
   includeThinking: boolean,
-): ChatCompletionChunk | null {
+  toolCallIndex: number,
+): ProcessEventResult | null {
   const delta: ChatCompletionChunkChoice['delta'] & {
     reasoning_content?: string;
   } = {};
+
+  let isToolCall = false;
 
   if (isFirstChunk) {
     delta.role = 'assistant';
@@ -96,7 +109,7 @@ function processEvent(
     };
     delta.tool_calls = [
       {
-        index: 0,
+        index: toolCallIndex,
         id: toolCall.callId ?? `call_${uuid()}`,
         type: 'function',
         function: {
@@ -105,6 +118,7 @@ function processEvent(
         },
       },
     ];
+    isToolCall = true;
   }
 
   // Only emit if we have content
@@ -113,17 +127,20 @@ function processEvent(
   }
 
   return {
-    id,
-    object: 'chat.completion.chunk',
-    created,
-    model,
-    choices: [
-      {
-        index: 0,
-        delta,
-        finish_reason: null,
-        logprobs: null,
-      },
-    ],
+    chunk: {
+      id,
+      object: 'chat.completion.chunk',
+      created,
+      model,
+      choices: [
+        {
+          index: 0,
+          delta,
+          finish_reason: null,
+          logprobs: null,
+        },
+      ],
+    },
+    isToolCall,
   };
 }

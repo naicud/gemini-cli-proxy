@@ -28,6 +28,11 @@ export const chatCompletionsRoute: FastifyPluginAsync<RouteOptions> = async (
   options,
 ) => {
   const sessionManager = new SessionManager();
+  // Single shared session per proxy instance - prevents memory leaks
+  // Each request sets its own history (OpenAI clients send full conversation each time)
+  let sharedSession: Awaited<
+    ReturnType<typeof sessionManager.getOrCreate>
+  > | null = null;
   const includeThinking = process.env['INCLUDE_THINKING'] === 'true';
 
   fastify.post<RequestBody>(
@@ -193,13 +198,18 @@ export const chatCompletionsRoute: FastifyPluginAsync<RouteOptions> = async (
       }
 
       try {
-        const session = await sessionManager.getOrCreate({
-          model: body.model,
-          workingDirectory: options.config?.workingDirectory,
-        });
+        // Reuse shared session or create one (singleton pattern prevents memory leaks)
+        if (!sharedSession) {
+          sharedSession = await sessionManager.getOrCreate({
+            model: body.model,
+            workingDirectory: options.config?.workingDirectory,
+          });
+        }
 
-        // Convert OpenAI messages to Gemini format
-        const { contents } = await openaiToGemini(body.messages);
+        // Convert OpenAI messages to Gemini format including system instruction
+        const { contents, systemInstruction } = await openaiToGemini(
+          body.messages,
+        );
 
         // Get the last user message content for streaming
         const lastUserContent = contents[contents.length - 1];
@@ -213,6 +223,20 @@ export const chatCompletionsRoute: FastifyPluginAsync<RouteOptions> = async (
           });
         }
 
+        // Set conversation history (all messages except the last one)
+        // This enables multi-turn conversations - critical for OpenAI API compatibility
+        const historyContents = contents.slice(0, -1);
+        sharedSession.client.setHistory(historyContents);
+
+        // TODO: Apply systemInstruction if available (requires GeminiClient API support)
+        // For now, systemInstruction is extracted but not used until API supports it
+        if (systemInstruction) {
+          request.log.debug(
+            { systemInstruction },
+            'System instruction extracted but not applied (pending API support)',
+          );
+        }
+
         const promptId = uuid();
         const abortController = new AbortController();
 
@@ -221,7 +245,7 @@ export const chatCompletionsRoute: FastifyPluginAsync<RouteOptions> = async (
           abortController.abort();
         });
 
-        const geminiStream = session.client.sendMessageStream(
+        const geminiStream = sharedSession.client.sendMessageStream(
           lastUserContent.parts ?? [],
           abortController.signal,
           promptId,
@@ -241,12 +265,39 @@ export const chatCompletionsRoute: FastifyPluginAsync<RouteOptions> = async (
             includeThinking,
           );
 
-          for await (const event of sseStream) {
-            const data =
-              typeof event.data === 'string'
-                ? event.data
-                : JSON.stringify(event.data);
-            reply.raw.write(`data: ${data}\n\n`);
+          try {
+            for await (const event of sseStream) {
+              const data =
+                typeof event.data === 'string'
+                  ? event.data
+                  : JSON.stringify(event.data);
+              reply.raw.write(`data: ${data}\n\n`);
+            }
+          } catch (streamError) {
+            // After headers are sent, send error as SSE event (can't use reply.status)
+            request.log.error(streamError, 'Error during streaming');
+            const errorChunk = {
+              id: `chatcmpl-${uuid()}`,
+              object: 'chat.completion.chunk',
+              created: Math.floor(Date.now() / 1000),
+              model: body.model,
+              choices: [
+                {
+                  index: 0,
+                  delta: {
+                    content: `\n\n[Error: ${
+                      streamError instanceof Error
+                        ? streamError.message
+                        : 'Stream error'
+                    }]`,
+                  },
+                  finish_reason: 'stop',
+                  logprobs: null,
+                },
+              ],
+            };
+            reply.raw.write(`data: ${JSON.stringify(errorChunk)}\n\n`);
+            reply.raw.write(`data: [DONE]\n\n`);
           }
 
           reply.raw.end();

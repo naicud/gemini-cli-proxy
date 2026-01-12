@@ -79,11 +79,11 @@ function processEvent(
     delta.content = event.value;
   }
 
-  // Handle thought events - value is ThoughtSummary with text property
+  // Handle thought events - value is ThoughtSummary with subject and description
   if (includeThinking && event.type === 'thought' && event.value) {
-    const thought = event.value as { text?: string };
-    if (thought.text) {
-      delta.reasoning_content = thought.text;
+    const thought = event.value as { subject?: string; description?: string };
+    if (thought.description) {
+      delta.reasoning_content = thought.description;
     }
   }
 

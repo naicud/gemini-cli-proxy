@@ -331,6 +331,38 @@ custom tools:
 See the [MCP Server Integration guide](./docs/tools/mcp-server.md) for setup
 instructions.
 
+### Proxy Server
+
+Use the OpenAI-compatible proxy server to integrate Gemini CLI with any tool
+that supports the OpenAI API:
+
+```bash
+# Start proxy server (uses Gemini CLI authentication)
+gemini-proxy
+
+# Or with custom options
+gemini-proxy --port 8080 --host 127.0.0.1 --include-thinking
+```
+
+Then use with any OpenAI-compatible client:
+
+```typescript
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  baseURL: 'http://localhost:3000/v1',
+  apiKey: 'not-needed',
+});
+
+const response = await client.chat.completions.create({
+  model: 'gemini-2.5-flash',
+  messages: [{ role: 'user', content: 'Hello!' }],
+});
+```
+
+See [Proxy Server README](./packages/proxy-server/README.md) for full
+documentation.
+
 ## 🤝 Contributing
 
 We welcome contributions! Gemini CLI is fully open source (Apache 2.0), and we

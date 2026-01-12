@@ -72,15 +72,34 @@ export async function createServer(
 }
 
 export async function main(): Promise<void> {
-  const port = parseInt(process.env['PORT'] ?? '3000', 10);
-  const host = process.env['HOST'] ?? '0.0.0.0';
-  const workingDirectory = process.env['WORKING_DIR'] ?? process.cwd();
+  // Import CLI module dynamically to avoid circular dependencies
+  const { parseCliArgs, printHelp, printVersion } = await import('./cli.js');
+
+  const cliOptions = parseCliArgs();
+
+  if (cliOptions.help) {
+    printHelp();
+    process.exit(0);
+  }
+
+  if (cliOptions.version) {
+    printVersion();
+    process.exit(0);
+  }
 
   const config: ServerConfig = {
-    port,
-    host,
-    workingDirectory,
+    port: cliOptions.port,
+    host: cliOptions.host,
+    workingDirectory: cliOptions.workingDir,
   };
+
+  // Set environment variables for downstream modules that read from env
+  if (cliOptions.corsOrigins) {
+    process.env['CORS_ORIGINS'] = cliOptions.corsOrigins;
+  }
+  if (cliOptions.includeThinking) {
+    process.env['INCLUDE_THINKING'] = 'true';
+  }
 
   const server = await createServer(config);
 

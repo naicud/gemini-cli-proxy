@@ -6,4 +6,5 @@
 
 export { createServer, main } from './server.js';
 export { SessionManager } from './session/session-manager.js';
-export type { ServerConfig } from './types.js';
+export { parseCliArgs, printHelp, printVersion } from './cli.js';
+export type { ServerConfig, CliOptions } from './types.js';

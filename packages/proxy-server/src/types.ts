@@ -16,3 +16,13 @@ export interface StreamEvent {
   readonly data: unknown;
   readonly retry?: number;
 }
+
+export interface CliOptions {
+  readonly port: number;
+  readonly host: string;
+  readonly corsOrigins: string | undefined;
+  readonly workingDir: string;
+  readonly includeThinking: boolean;
+  readonly help: boolean;
+  readonly version: boolean;
+}

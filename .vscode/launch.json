@@ -92,17 +92,35 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "Launch Proxy Server",
+      "name": "Proxy Server (Fastify)",
       "runtimeExecutable": "npx",
       "runtimeArgs": ["tsx", "src/server.ts"],
+      "args": ["--port", "3000", "--host", "127.0.0.1", "--include-thinking"],
       "cwd": "${workspaceFolder}/packages/proxy-server",
       "console": "integratedTerminal",
-      "skipFiles": ["<node_internals>/**"],
-      "env": {
-        "PORT": "3000",
-        "HOST": "127.0.0.1",
-        "INCLUDE_THINKING": "true"
-      }
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Proxy CLI (Interactive Args)",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx", "src/server.ts"],
+      "args": ["${input:proxyArgs}"],
+      "cwd": "${workspaceFolder}/packages/proxy-server",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Proxy Server (Built)",
+      "program": "${workspaceFolder}/packages/proxy-server/dist/server.js",
+      "args": ["--port", "3000", "--host", "0.0.0.0"],
+      "cwd": "${workspaceFolder}/packages/proxy-server",
+      "console": "integratedTerminal",
+      "preLaunchTask": "npm: build: proxy-server",
+      "skipFiles": ["<node_internals>/**"]
     },
     {
       "type": "node",
@@ -144,6 +162,12 @@
       "type": "promptString",
       "description": "Enter the path to the test file (e.g., ${workspaceFolder}/packages/cli/src/ui/components/LoadingIndicator.test.tsx)",
       "default": "${workspaceFolder}/packages/cli/src/ui/components/LoadingIndicator.test.tsx"
+    },
+    {
+      "id": "proxyArgs",
+      "type": "promptString",
+      "description": "Enter CLI flags for proxy (e.g., --help, --version, --port 8080)",
+      "default": "--help"
     }
   ]
 }

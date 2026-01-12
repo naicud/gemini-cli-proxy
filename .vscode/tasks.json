@@ -20,6 +20,15 @@
       "problemMatcher": [],
       "label": "npm: build: vscode-ide-companion",
       "detail": "npm run build -w packages/vscode-ide-companion"
+    },
+    {
+      "type": "npm",
+      "script": "build",
+      "path": "packages/proxy-server",
+      "group": "build",
+      "problemMatcher": [],
+      "label": "npm: build: proxy-server",
+      "detail": "npm run build -w packages/proxy-server"
     }
   ]
 }

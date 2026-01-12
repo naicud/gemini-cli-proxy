@@ -9,18 +9,58 @@ OpenAI-compatible HTTP SSE proxy server for Gemini CLI.
 gemini  # This opens browser for Google OAuth
 
 # Start proxy server
+gemini-proxy
+```
+
+## CLI Usage
+
+### Command Line Options
+
+| Flag                 | Short | Default   | Description                    |
+| -------------------- | ----- | --------- | ------------------------------ |
+| `--port`             | `-p`  | `3000`    | Server port                    |
+| `--host`             | `-H`  | `0.0.0.0` | Bind address                   |
+| `--cors-origins`     |       | `*`       | CORS origins (comma-separated) |
+| `--working-dir`      | `-w`  | `cwd`     | Working directory              |
+| `--include-thinking` |       | `false`   | Include reasoning in response  |
+| `--help`             | `-h`  |           | Show help                      |
+| `--version`          | `-v`  |           | Show version                   |
+
+### Examples
+
+```bash
+# Start with defaults
+gemini-proxy
+
+# Custom port and host
+gemini-proxy --port 8080 --host 127.0.0.1
+
+# Docker deployment
+gemini-proxy -p 3000 -H 0.0.0.0 --include-thinking
+
+# Using environment variables (CLI flags take precedence)
+PORT=8080 HOST=127.0.0.1 gemini-proxy
+```
+
+### Development Mode
+
+```bash
+# Run with tsx for development
 npm run dev
+
+# Or with environment variables
+PORT=3000 HOST=127.0.0.1 INCLUDE_THINKING=true npm run dev
 ```
 
 ## Authentication Methods
 
-| Method           | Setup                                  | Bearer Token |
-| ---------------- | -------------------------------------- | ------------ |
-| **Google OAuth** | Run `gemini` CLI once                  | Not needed   |
-| **API Key**      | `GEMINI_API_KEY=xxx npm run dev`       | Optional     |
-| **Vertex AI**    | `GOOGLE_CLOUD_PROJECT=xxx npm run dev` | Not needed   |
+| Method           | Setup                                   | Bearer Token |
+| ---------------- | --------------------------------------- | ------------ |
+| **Google OAuth** | Run `gemini` CLI once                   | Not needed   |
+| **API Key**      | `GEMINI_API_KEY=xxx gemini-proxy`       | Optional     |
+| **Vertex AI**    | `GOOGLE_CLOUD_PROJECT=xxx gemini-proxy` | Not needed   |
 
-## Usage
+## API Usage
 
 ### cURL (Streaming)
 
@@ -58,6 +98,7 @@ for await (const chunk of stream) {
 | ---------------------- | ------ | -------------------------------------------- |
 | `/v1/chat/completions` | POST   | Chat completions (streaming + non-streaming) |
 | `/v1/models`           | GET    | List available models                        |
+| `/docs`                | GET    | Swagger UI documentation                     |
 
 ## Environment Variables
 
@@ -65,9 +106,30 @@ for await (const chunk of stream) {
 | ---------------------- | --------- | -------------------------------- |
 | `PORT`                 | `3000`    | Server port                      |
 | `HOST`                 | `0.0.0.0` | Bind address                     |
-| `GEMINI_API_KEY`       | -         | API key (for USE_GEMINI auth)    |
-| `GOOGLE_CLOUD_PROJECT` | -         | GCP project (for Vertex AI auth) |
+| `CORS_ORIGINS`         | `*`       | CORS origins (comma-separated)   |
+| `WORKING_DIR`          | `cwd`     | Working directory                |
 | `INCLUDE_THINKING`     | `false`   | Include reasoning in response    |
+| `GEMINI_API_KEY`       | -         | API key (for API key auth)       |
+| `GOOGLE_CLOUD_PROJECT` | -         | GCP project (for Vertex AI auth) |
+
+## Docker Deployment
+
+```dockerfile
+FROM node:20-slim
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+COPY . .
+
+EXPOSE 3000
+CMD ["gemini-proxy", "-p", "3000", "-H", "0.0.0.0"]
+```
+
+```bash
+docker build -t gemini-proxy .
+docker run -p 3000:3000 gemini-proxy
+```
 
 ## Available Models
 

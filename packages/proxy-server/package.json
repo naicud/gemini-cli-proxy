@@ -1,0 +1,45 @@
+{
+  "name": "@google/gemini-cli-proxy-server",
+  "version": "0.1.0",
+  "description": "OpenAI-compatible HTTP SSE proxy server for Gemini CLI",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/google-gemini/gemini-cli.git",
+    "directory": "packages/proxy-server"
+  },
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "gemini-proxy": "dist/server.js"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build_package.js",
+    "start": "node dist/server.js",
+    "dev": "tsx src/server.ts",
+    "lint": "eslint . --ext .ts,.tsx",
+    "format": "prettier --write .",
+    "test": "vitest run",
+    "test:ci": "vitest run --coverage",
+    "typecheck": "tsc --noEmit"
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@google/gemini-cli-core": "file:../core",
+    "fastify": "^5.2.2",
+    "@fastify/sse": "^0.4.0",
+    "openai": "^4.104.0",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "tsx": "^4.20.3",
+    "typescript": "^5.3.3",
+    "vitest": "^3.1.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

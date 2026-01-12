@@ -178,7 +178,6 @@ export const chatCompletionsRoute: FastifyPluginAsync<RouteOptions> = async (
           },
         },
       },
-      sse: true,
     },
     async (request: FastifyRequest<RequestBody>, reply: FastifyReply) => {
       const body = request.body;
@@ -229,13 +228,29 @@ export const chatCompletionsRoute: FastifyPluginAsync<RouteOptions> = async (
         );
 
         if (body.stream) {
-          // Streaming response using @fastify/sse
+          // Streaming response - write SSE manually
+          reply.raw.writeHead(200, {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            Connection: 'keep-alive',
+          });
+
           const sseStream = geminiToOpenAIStream(
             geminiStream,
             body.model,
             includeThinking,
           );
-          await reply.sse.send(sseStream);
+
+          for await (const event of sseStream) {
+            const data =
+              typeof event.data === 'string'
+                ? event.data
+                : JSON.stringify(event.data);
+            reply.raw.write(`data: ${data}\n\n`);
+          }
+
+          reply.raw.end();
+          return;
         } else {
           // Non-streaming response - collect all chunks
           const chunks: OpenAI.ChatCompletionChunk[] = [];

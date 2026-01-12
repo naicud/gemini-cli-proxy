@@ -12,21 +12,19 @@ import { GeminiEventType } from '@google/gemini-cli-core';
 
 // Mock the session manager module - uses a simple content generator
 vi.mock('../session/session-manager.js', () => ({
-  SessionManager () {
-    return {
-      getOrCreate: async () => ({
-        id: 'test-session-id',
-        client: {
-          async *sendMessageStream () {
-            yield { type: GeminiEventType.Content, value: 'Test response' };
-          },
+  SessionManager: class {
+    getOrCreate = async () => ({
+      id: 'test-session-id',
+      client: {
+        async *sendMessageStream () {
+          yield { type: GeminiEventType.Content, value: 'Test response' };
         },
-        config: {},
-        createdAt: new Date(),
-      }),
-      get: vi.fn(),
-      delete: vi.fn(),
-    };
+      },
+      config: {},
+      createdAt: new Date(),
+    });
+    get = vi.fn();
+    delete = vi.fn();
   },
 }));
 

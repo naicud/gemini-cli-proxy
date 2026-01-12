@@ -114,6 +114,17 @@
     {
       "type": "node",
       "request": "launch",
+      "name": "Proxy CLI (Default)",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx", "src/server.ts"],
+      "args": [],
+      "cwd": "${workspaceFolder}/packages/proxy-server",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
       "name": "Proxy Server (Built)",
       "program": "${workspaceFolder}/packages/proxy-server/dist/server.js",
       "args": ["--port", "3000", "--host", "0.0.0.0"],

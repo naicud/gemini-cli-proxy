@@ -9,6 +9,7 @@ import {
   type ServerGeminiContentEvent,
   type ServerGeminiThoughtEvent,
   type ServerGeminiToolCallRequestEvent,
+  type ServerGeminiFinishedEvent,
 } from '@google/gemini-cli-core';
 
 /**
@@ -47,6 +48,23 @@ export function createToolCallEvent(
       args,
       isClientInitiated: false,
       prompt_id: 'test-prompt-id',
+    },
+  };
+}
+
+/**
+ * Creates a mock finished event with optional usage metadata.
+ */
+export function createFinishedEvent(usage?: {
+  promptTokenCount?: number;
+  candidatesTokenCount?: number;
+  totalTokenCount?: number;
+}): ServerGeminiFinishedEvent {
+  return {
+    type: GeminiEventType.Finished,
+    value: {
+      reason: undefined,
+      usageMetadata: usage,
     },
   };
 }

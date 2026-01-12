@@ -24,8 +24,18 @@ export async function* geminiToOpenAIStream(
   const created = Math.floor(Date.now() / 1000);
   let isFirstChunk = true;
   let toolCallIndex = 0;
+  let usage: OpenAI.CompletionUsage | undefined;
 
   for await (const event of geminiStream) {
+    // Capture usage if available in the finished event
+    if (event.type === 'finished' && event.value.usageMetadata) {
+      usage = {
+        prompt_tokens: event.value.usageMetadata.promptTokenCount ?? 0,
+        completion_tokens: event.value.usageMetadata.candidatesTokenCount ?? 0,
+        total_tokens: event.value.usageMetadata.totalTokenCount ?? 0,
+      };
+    }
+
     const result = processEvent(
       event,
       id,
@@ -44,8 +54,10 @@ export async function* geminiToOpenAIStream(
     }
   }
 
-  // Final chunk with finish_reason
-  const finalChunk: ChatCompletionChunk = {
+  // Final chunk with finish_reason and usage
+  const finalChunk: ChatCompletionChunk & {
+    usage?: OpenAI.CompletionUsage;
+  } = {
     id,
     object: 'chat.completion.chunk',
     created,
@@ -58,6 +70,7 @@ export async function* geminiToOpenAIStream(
         logprobs: null,
       },
     ],
+    usage,
   };
   yield { data: finalChunk };
   yield { data: '[DONE]' };

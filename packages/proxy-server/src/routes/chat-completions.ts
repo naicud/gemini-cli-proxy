@@ -33,7 +33,7 @@ export const chatCompletionsRoute: FastifyPluginAsync<RouteOptions> = async (
   let sharedSession: Awaited<
     ReturnType<typeof sessionManager.getOrCreate>
   > | null = null;
-  const includeThinking = process.env['INCLUDE_THINKING'] === 'true';
+  const includeThinking = process.env['INCLUDE_THINKING'] !== 'false';
 
   fastify.post<RequestBody>(
     '/v1/chat/completions',
@@ -165,6 +165,7 @@ export const chatCompletionsRoute: FastifyPluginAsync<RouteOptions> = async (
                       properties: {
                         role: { type: 'string' },
                         content: { type: 'string', nullable: true },
+                        reasoning_content: { type: 'string', nullable: true },
                       },
                     },
                     finish_reason: { type: 'string' },
@@ -305,17 +306,25 @@ export const chatCompletionsRoute: FastifyPluginAsync<RouteOptions> = async (
         } else {
           // Non-streaming response - collect all chunks
           const chunks: OpenAI.ChatCompletionChunk[] = [];
+          let usage: OpenAI.CompletionUsage | undefined;
+
           for await (const event of geminiToOpenAIStream(
             geminiStream,
             body.model,
             includeThinking,
           )) {
             if (typeof event.data !== 'string') {
-              chunks.push(event.data as OpenAI.ChatCompletionChunk);
+              const chunk = event.data as OpenAI.ChatCompletionChunk & {
+                usage?: OpenAI.CompletionUsage;
+              };
+              if (chunk.usage) {
+                usage = chunk.usage;
+              }
+              chunks.push(chunk);
             }
           }
 
-          const response = buildNonStreamingResponse(chunks, body.model);
+          const response = buildNonStreamingResponse(chunks, body.model, usage);
           return await reply.send(response);
         }
       } catch (error) {
@@ -336,9 +345,21 @@ export const chatCompletionsRoute: FastifyPluginAsync<RouteOptions> = async (
 function buildNonStreamingResponse(
   chunks: OpenAI.ChatCompletionChunk[],
   model: string,
-): ChatCompletion {
+  usage?: OpenAI.CompletionUsage,
+): ChatCompletion & {
+  choices: Array<{ message: { reasoning_content?: string | null } }>;
+} {
   const content = chunks
     .map((c) => c.choices[0]?.delta?.content ?? '')
+    .join('');
+
+  // Collect reasoning content from chunks
+  const reasoningContent = chunks
+    .map(
+      (c) =>
+        (c.choices[0]?.delta as { reasoning_content?: string })
+          ?.reasoning_content ?? '',
+    )
     .join('');
 
   const toolCalls = chunks
@@ -358,6 +379,7 @@ function buildNonStreamingResponse(
         message: {
           role: 'assistant',
           content: content || null,
+          reasoning_content: reasoningContent || undefined,
           tool_calls:
             toolCalls.length > 0
               ? toolCalls.map((tc) => ({
@@ -375,7 +397,7 @@ function buildNonStreamingResponse(
         logprobs: null,
       },
     ],
-    usage: {
+    usage: usage ?? {
       prompt_tokens: 0,
       completion_tokens: 0,
       total_tokens: 0,

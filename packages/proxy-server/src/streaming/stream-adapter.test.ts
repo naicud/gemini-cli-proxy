@@ -10,6 +10,7 @@ import {
   createContentEvent,
   createThoughtEvent,
   createToolCallEvent,
+  createFinishedEvent,
   arrayToAsyncGenerator,
 } from '../__tests__/test-utils.js';
 
@@ -233,6 +234,93 @@ describe('geminiToOpenAIStream', () => {
       const argsJson =
         toolChunk.choices[0]?.delta.tool_calls?.[0]?.function.arguments;
       expect(JSON.parse(argsJson ?? '{}')).toEqual(complexArgs);
+    });
+  });
+
+  describe('usage metadata', () => {
+    it('includes usage in final chunk when finished event has usageMetadata', async () => {
+      const events = [
+        createContentEvent('Hello'),
+        createFinishedEvent({
+          promptTokenCount: 10,
+          candidatesTokenCount: 20,
+          totalTokenCount: 30,
+        }),
+      ];
+
+      const chunks: unknown[] = [];
+      for await (const sse of geminiToOpenAIStream(
+        arrayToAsyncGenerator(events),
+        'gemini-2.5-flash',
+      )) {
+        chunks.push(sse.data);
+      }
+
+      // Find the final chunk (not [DONE])
+      const finalChunk = chunks[chunks.length - 2] as {
+        usage?: {
+          prompt_tokens: number;
+          completion_tokens: number;
+          total_tokens: number;
+        };
+      };
+
+      expect(finalChunk.usage).toEqual({
+        prompt_tokens: 10,
+        completion_tokens: 20,
+        total_tokens: 30,
+      });
+    });
+
+    it('does not include usage when finished event has no usageMetadata', async () => {
+      const events = [createContentEvent('Hello'), createFinishedEvent()];
+
+      const chunks: unknown[] = [];
+      for await (const sse of geminiToOpenAIStream(
+        arrayToAsyncGenerator(events),
+        'gemini-2.5-flash',
+      )) {
+        chunks.push(sse.data);
+      }
+
+      // Find the final chunk (not [DONE])
+      const finalChunk = chunks[chunks.length - 2] as {
+        usage?: unknown;
+      };
+
+      expect(finalChunk.usage).toBeUndefined();
+    });
+
+    it('handles partial usage metadata with defaults', async () => {
+      const events = [
+        createContentEvent('Test'),
+        createFinishedEvent({
+          promptTokenCount: 5,
+          // candidatesTokenCount and totalTokenCount missing
+        }),
+      ];
+
+      const chunks: unknown[] = [];
+      for await (const sse of geminiToOpenAIStream(
+        arrayToAsyncGenerator(events),
+        'gemini-2.5-flash',
+      )) {
+        chunks.push(sse.data);
+      }
+
+      const finalChunk = chunks[chunks.length - 2] as {
+        usage?: {
+          prompt_tokens: number;
+          completion_tokens: number;
+          total_tokens: number;
+        };
+      };
+
+      expect(finalChunk.usage).toEqual({
+        prompt_tokens: 5,
+        completion_tokens: 0,
+        total_tokens: 0,
+      });
     });
   });
 

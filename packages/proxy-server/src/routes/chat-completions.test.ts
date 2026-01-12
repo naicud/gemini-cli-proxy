@@ -17,7 +17,22 @@ vi.mock('../session/session-manager.js', () => ({
       id: 'test-session-id',
       client: {
         async *sendMessageStream() {
+          yield {
+            type: GeminiEventType.Thought,
+            value: { description: 'Thinking process...' },
+          };
           yield { type: GeminiEventType.Content, value: 'Test response' };
+          yield {
+            type: GeminiEventType.Finished,
+            value: {
+              reason: undefined,
+              usageMetadata: {
+                promptTokenCount: 100,
+                candidatesTokenCount: 50,
+                totalTokenCount: 150,
+              },
+            },
+          };
         },
         setHistory: vi.fn(),
       },
@@ -122,11 +137,45 @@ describe('chatCompletionsRoute - Unit Tests', () => {
       const body = JSON.parse(response.body);
       expect(body.id).toMatch(/^chatcmpl-/);
       expect(body.created).toBeTypeOf('number');
-      expect(body.usage).toEqual({
-        prompt_tokens: 0,
-        completion_tokens: 0,
-        total_tokens: 0,
+      expect(body.usage).toBeDefined();
+    });
+
+    it('includes usage metadata from Gemini response', async () => {
+      const response = await fastify.inject({
+        method: 'POST',
+        url: '/v1/chat/completions',
+        payload: {
+          model: 'gemini-2.5-flash',
+          messages: [{ role: 'user', content: 'Hello' }],
+          stream: false,
+        },
       });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.usage).toEqual({
+        prompt_tokens: 100,
+        completion_tokens: 50,
+        total_tokens: 150,
+      });
+    });
+
+    it('includes reasoning_content when thinking is available', async () => {
+      const response = await fastify.inject({
+        method: 'POST',
+        url: '/v1/chat/completions',
+        payload: {
+          model: 'gemini-2.5-flash',
+          messages: [{ role: 'user', content: 'Hello' }],
+          stream: false,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.choices[0].message.reasoning_content).toBe(
+        'Thinking process...',
+      );
     });
   });
 

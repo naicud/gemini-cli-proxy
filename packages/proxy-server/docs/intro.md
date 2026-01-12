@@ -26,14 +26,14 @@ Google's powerful Gemini models.
 ## How it works
 
 ```mermaid
-frontend-diagram
+sequenceDiagram
     participant Client as User/OpenAI Client
     participant Proxy as Gemini Proxy
     participant Google as Google Gemini API
 
-    Client->>Proxy: POST /v1/chat/completions (OpenAI Format)
+    Client->>Proxy: POST /v1/chat/completions ("OpenAI Format")
     Proxy->>Proxy: Auth & Convert Request
-    Proxy->>Google: Generate Content (Gemini Format)
+    Proxy->>Google: Generate Content ("Gemini Format")
     Google-->>Proxy: Stream Tokens / Thinking
-    Proxy-->>Client: Application (OpenAI SSE Format)
+    Proxy-->>Client: Application ("OpenAI SSE Format")
 ```

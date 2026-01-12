@@ -12,7 +12,7 @@ The server is built on **Fastify** and uses a modular plugin architecture.
 
 ```mermaid
 graph TD
-    Client[Client (OpenAI SDK)] -->|HTTP POST| Proxy[Gemini Proxy]
+    Client["Client (OpenAI SDK)"] -->|HTTP POST| Proxy[Gemini Proxy]
     Proxy -->|Auth Check| Auth{Authorized?}
     Auth -->|No| 401[401 Unauth]
     Auth -->|Yes| Parser[Request Parser]

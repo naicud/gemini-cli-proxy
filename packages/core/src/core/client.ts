@@ -520,6 +520,7 @@ export class GeminiClient {
     prompt_id: string,
     boundedTurns: number,
     isInvalidStreamRetry: boolean,
+    overrides?: GenerateContentConfig,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     // Re-initialize turn (it was empty before if in loop, or new instance)
     let turn = new Turn(this.getChat(), prompt_id);
@@ -634,7 +635,12 @@ export class GeminiClient {
     this.currentSequenceModel = modelToUse;
     yield { type: GeminiEventType.ModelInfo, value: modelToUse };
 
-    const resultStream = turn.run(modelConfigKey, request, linkedSignal);
+    const resultStream = turn.run(
+      modelConfigKey,
+      request,
+      linkedSignal,
+      overrides,
+    );
     let isError = false;
     let isInvalidStream = false;
 
@@ -741,6 +747,7 @@ export class GeminiClient {
     prompt_id: string,
     turns: number = MAX_TURNS,
     isInvalidStreamRetry: boolean = false,
+    overrides?: GenerateContentConfig,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     if (!isInvalidStreamRetry) {
       this.config.resetTurn();
@@ -797,6 +804,7 @@ export class GeminiClient {
         prompt_id,
         boundedTurns,
         isInvalidStreamRetry,
+        overrides,
       );
 
       // Fire AfterAgent hook if we have a turn and no pending tools

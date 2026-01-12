@@ -33,6 +33,7 @@
     "@fastify/swagger-ui": "^5.2.4",
     "@google/gemini-cli-core": "file:../core",
     "fastify": "^5.2.2",
+    "fastify-plugin": "^5.1.0",
     "openai": "^4.104.0",
     "uuid": "^13.0.0"
   },

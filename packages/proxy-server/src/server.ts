@@ -13,12 +13,17 @@ import { chatCompletionsRoute } from './routes/chat-completions.js';
 import { modelsRoute } from './routes/models.js';
 import type { ServerConfig } from './types.js';
 
+import { loggerPlugin } from './plugins/logger.js';
+
 export async function createServer(
   config: Partial<ServerConfig> = {},
 ): Promise<FastifyInstance> {
   const fastify = Fastify({
     logger: true,
   });
+
+  // Register Logger Plugin (Custom request/response logging)
+  await fastify.register(loggerPlugin);
 
   // Register CORS
   const corsOrigins = process.env['CORS_ORIGINS'];

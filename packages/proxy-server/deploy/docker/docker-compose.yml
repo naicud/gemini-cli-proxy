@@ -1,0 +1,46 @@
+# Gemini CLI Proxy Server - Docker Compose
+#
+# Usage:
+#   # With API Key (recommended)
+#   GEMINI_API_KEY=your-key docker compose up -d
+#
+#   # With OAuth tokens (mount from host)
+#   docker compose --profile oauth up -d
+#
+#   # With Vertex AI
+#   GOOGLE_CLOUD_PROJECT=your-project docker compose up -d
+
+services:
+  gemini-proxy:
+    build:
+      context: ../../../..
+      dockerfile: packages/proxy-server/deploy/docker/Dockerfile
+    image: gemini-proxy:latest
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - PORT=3000
+      - HOST=0.0.0.0
+      # Auth: Choose ONE method
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-}
+      # Optional settings
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      - INCLUDE_THINKING=${INCLUDE_THINKING:-true}
+      - WORKING_DIR=/app
+    restart: unless-stopped
+    profiles:
+      - standard
+    # volumes:
+
+  # OAuth profile: use local tokens
+  gemini-proxy-oauth:
+    extends: gemini-proxy
+    profiles:
+      - oauth
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      - ~/.gemini:/home/gemini/.gemini
+
+

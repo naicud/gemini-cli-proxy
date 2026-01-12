@@ -289,6 +289,7 @@ export class GeminiChat {
     message: PartListUnion,
     prompt_id: string,
     signal: AbortSignal,
+    overrides?: GenerateContentConfig,
   ): Promise<AsyncGenerator<StreamEvent>> {
     await this.sendPromise;
 
@@ -345,6 +346,7 @@ export class GeminiChat {
               requestContents,
               prompt_id,
               signal,
+              overrides,
             );
             isConnectionPhase = false;
             for await (const chunk of stream) {
@@ -436,6 +438,7 @@ export class GeminiChat {
     requestContents: Content[],
     prompt_id: string,
     abortSignal: AbortSignal,
+    overrides?: GenerateContentConfig,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     const contentsForPreviewModel =
       this.ensureActiveLoopHasThoughtSignatures(requestContents);
@@ -486,9 +489,12 @@ export class GeminiChat {
       }
 
       lastModelToUse = modelToUse;
+
       const config: GenerateContentConfig = {
         ...currentGenerateContentConfig,
-        // TODO(12622): Ensure we don't overrwrite these when they are
+        // Apply per-request overrides (e.g. max_tokens from proxy)
+        ...overrides,
+        // TODO(12622): Ensure we don't overwrite these when they are
         // passed via config.
         systemInstruction: this.systemInstruction,
         tools: this.tools,

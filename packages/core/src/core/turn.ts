@@ -11,6 +11,7 @@ import type {
   FunctionDeclaration,
   FinishReason,
   GenerateContentResponseUsageMetadata,
+  GenerateContentConfig,
 } from '@google/genai';
 import type {
   ToolCallConfirmationDetails,
@@ -243,6 +244,7 @@ export class Turn {
     modelConfigKey: ModelConfigKey,
     req: PartListUnion,
     signal: AbortSignal,
+    overrides?: GenerateContentConfig,
   ): AsyncGenerator<ServerGeminiStreamEvent> {
     try {
       // Note: This assumes `sendMessageStream` yields events like
@@ -252,6 +254,7 @@ export class Turn {
         req,
         this.prompt_id,
         signal,
+        overrides,
       );
 
       for await (const streamEvent of responseStream) {

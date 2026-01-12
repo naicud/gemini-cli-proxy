@@ -123,6 +123,7 @@ export const chatCompletionsRoute: FastifyPluginAsync<RouteOptions> = async (
             temperature: { type: 'number', minimum: 0, maximum: 2, default: 1 },
             top_p: { type: 'number', minimum: 0, maximum: 1, default: 1 },
             max_tokens: { type: 'integer' },
+            max_completion_tokens: { type: 'integer' },
             presence_penalty: {
               type: 'number',
               minimum: -2,
@@ -246,10 +247,42 @@ export const chatCompletionsRoute: FastifyPluginAsync<RouteOptions> = async (
           abortController.abort();
         });
 
+        // Build per-request config overrides from OpenAI parameters
+        const configOverrides: Record<string, unknown> = {};
+        // Map OpenAI max_tokens/max_completion_tokens to Gemini maxOutputTokens
+        // max_completion_tokens takes precedence (new standard for reasoning models)
+        if (body.max_completion_tokens !== undefined) {
+          configOverrides['maxOutputTokens'] = body.max_completion_tokens;
+        } else if (body.max_tokens !== undefined) {
+          configOverrides['maxOutputTokens'] = body.max_tokens;
+        }
+        if (body.temperature !== undefined) {
+          configOverrides['temperature'] = body.temperature;
+        }
+        if (body.top_p !== undefined) {
+          configOverrides['topP'] = body.top_p;
+        }
+        if (body.stop !== undefined) {
+          configOverrides['stopSequences'] = Array.isArray(body.stop)
+            ? body.stop
+            : [body.stop];
+        }
+
+        // Log config overrides for debugging
+        if (Object.keys(configOverrides).length > 0) {
+          request.log.debug(
+            { configOverrides },
+            'Applying config overrides from OpenAI request',
+          );
+        }
+
         const geminiStream = sharedSession.client.sendMessageStream(
           lastUserContent.parts ?? [],
           abortController.signal,
           promptId,
+          undefined, // turns (use default)
+          false, // isInvalidStreamRetry
+          Object.keys(configOverrides).length > 0 ? configOverrides : undefined,
         );
 
         if (body.stream) {

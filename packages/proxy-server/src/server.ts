@@ -5,7 +5,10 @@
  */
 
 import Fastify, { type FastifyInstance } from 'fastify';
+import fastifyCors from '@fastify/cors';
 import fastifySSE from '@fastify/sse';
+import fastifySwagger from '@fastify/swagger';
+import fastifySwaggerUi from '@fastify/swagger-ui';
 import { chatCompletionsRoute } from './routes/chat-completions.js';
 import { modelsRoute } from './routes/models.js';
 import type { ServerConfig } from './types.js';
@@ -15,6 +18,47 @@ export async function createServer(
 ): Promise<FastifyInstance> {
   const fastify = Fastify({
     logger: true,
+  });
+
+  // Register CORS
+  const corsOrigins = process.env['CORS_ORIGINS'];
+  await fastify.register(fastifyCors, {
+    origin: corsOrigins
+      ? corsOrigins === '*'
+        ? true
+        : corsOrigins.split(',').map((o) => o.trim())
+      : true, // Allow all by default for dev
+  });
+
+  // Register Swagger
+  await fastify.register(fastifySwagger, {
+    openapi: {
+      openapi: '3.0.0',
+      info: {
+        title: 'Gemini CLI Proxy Server',
+        description: 'OpenAI-compatible REST API for Gemini CLI',
+        version: '0.1.0',
+      },
+      servers: [
+        {
+          url: 'http://localhost:3000',
+          description: 'Local development server',
+        },
+      ],
+      tags: [
+        { name: 'chat', description: 'Chat completions endpoints' },
+        { name: 'models', description: 'Model management endpoints' },
+      ],
+    },
+  });
+
+  // Register Swagger UI
+  await fastify.register(fastifySwaggerUi, {
+    routePrefix: '/docs',
+    uiConfig: {
+      docExpansion: 'list',
+      deepLinking: true,
+    },
   });
 
   // Register @fastify/sse plugin

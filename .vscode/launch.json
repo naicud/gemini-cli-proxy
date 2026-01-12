@@ -88,6 +88,21 @@
       "env": {
         "GEMINI_SANDBOX": "false"
       }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Launch Proxy Server",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx", "src/server.ts"],
+      "cwd": "${workspaceFolder}/packages/proxy-server",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"],
+      "env": {
+        "PORT": "3000",
+        "HOST": "127.0.0.1",
+        "INCLUDE_THINKING": "true"
+      }
     }
   ],
   "inputs": [

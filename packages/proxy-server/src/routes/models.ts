@@ -49,13 +49,83 @@ const AVAILABLE_MODELS: readonly Model[] = [
 ];
 
 export const modelsRoute: FastifyPluginAsync = async (fastify) => {
-  fastify.get('/v1/models', async (_request, reply) => reply.send({
-      object: 'list',
-      data: AVAILABLE_MODELS,
-    }));
+  fastify.get(
+    '/v1/models',
+    {
+      schema: {
+        description: 'Lists the currently available models.',
+        tags: ['models'],
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              object: { type: 'string', example: 'list' },
+              data: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    object: { type: 'string', example: 'model' },
+                    created: { type: 'number' },
+                    owned_by: { type: 'string', example: 'google' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    async (_request, reply) =>
+      reply.send({
+        object: 'list',
+        data: AVAILABLE_MODELS,
+      }),
+  );
 
   fastify.get<{ Params: { model: string } }>(
     '/v1/models/:model',
+    {
+      schema: {
+        description: 'Retrieves a model instance.',
+        tags: ['models'],
+        params: {
+          type: 'object',
+          properties: {
+            model: {
+              type: 'string',
+              description: 'The ID of the model to use for this request',
+            },
+          },
+          required: ['model'],
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              object: { type: 'string', example: 'model' },
+              created: { type: 'number' },
+              owned_by: { type: 'string', example: 'google' },
+            },
+          },
+          404: {
+            type: 'object',
+            properties: {
+              error: {
+                type: 'object',
+                properties: {
+                  message: { type: 'string' },
+                  type: { type: 'string' },
+                  code: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
     async (request, reply) => {
       const { model } = request.params;
       const foundModel = AVAILABLE_MODELS.find((m) => m.id === model);

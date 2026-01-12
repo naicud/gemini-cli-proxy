@@ -32,7 +32,154 @@ export const chatCompletionsRoute: FastifyPluginAsync<RouteOptions> = async (
 
   fastify.post<RequestBody>(
     '/v1/chat/completions',
-    { sse: true },
+    {
+      schema: {
+        description:
+          'Creates a model response for the given chat conversation.',
+        tags: ['chat'],
+        body: {
+          type: 'object',
+          required: ['messages', 'model'],
+          properties: {
+            model: {
+              type: 'string',
+              description: 'ID of the model to use.',
+              enum: [
+                'gemini-2.5-pro',
+                'gemini-2.5-flash',
+                'gemini-2.5-flash-lite',
+                'gemini-3-pro-preview',
+                'gemini-3-flash-preview',
+                'auto',
+              ],
+            },
+            messages: {
+              type: 'array',
+              description:
+                'A list of messages comprising the conversation so far.',
+              items: {
+                type: 'object',
+                required: ['role', 'content'],
+                properties: {
+                  role: {
+                    type: 'string',
+                    enum: ['system', 'user', 'assistant', 'tool'],
+                  },
+                  content: {
+                    anyOf: [
+                      { type: 'string' },
+                      {
+                        type: 'array',
+                        items: {
+                          anyOf: [
+                            {
+                              type: 'object',
+                              properties: {
+                                type: { type: 'string', const: 'text' },
+                                text: { type: 'string' },
+                              },
+                              required: ['type', 'text'],
+                            },
+                            {
+                              type: 'object',
+                              properties: {
+                                type: { type: 'string', const: 'image_url' },
+                                image_url: {
+                                  type: 'object',
+                                  properties: {
+                                    url: {
+                                      type: 'string',
+                                      description:
+                                        'URL or base64 data URL (data:image/jpeg;base64,...)',
+                                    },
+                                    detail: {
+                                      type: 'string',
+                                      enum: ['auto', 'low', 'high'],
+                                      description:
+                                        'Image detail level (defaults to auto)',
+                                    },
+                                  },
+                                  required: ['url'],
+                                },
+                              },
+                              required: ['type', 'image_url'],
+                            },
+                          ],
+                        },
+                      },
+                    ],
+                  },
+                  name: { type: 'string' },
+                  tool_call_id: { type: 'string' },
+                },
+              },
+            },
+            stream: { type: 'boolean', default: false },
+            temperature: { type: 'number', minimum: 0, maximum: 2, default: 1 },
+            top_p: { type: 'number', minimum: 0, maximum: 1, default: 1 },
+            max_tokens: { type: 'integer' },
+            presence_penalty: {
+              type: 'number',
+              minimum: -2,
+              maximum: 2,
+              default: 0,
+            },
+            frequency_penalty: {
+              type: 'number',
+              minimum: -2,
+              maximum: 2,
+              default: 0,
+            },
+            stop: {
+              anyOf: [
+                { type: 'string' },
+                { type: 'array', items: { type: 'string' } },
+              ],
+            },
+          },
+        },
+        response: {
+          200: {
+            description: 'Successful response',
+            // Note: SSE responses aren't well-modeled in standard JSON schema
+            // but we provide the non-streaming object structure
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              object: { type: 'string', example: 'chat.completion' },
+              created: { type: 'number' },
+              model: { type: 'string' },
+              choices: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    index: { type: 'number' },
+                    message: {
+                      type: 'object',
+                      properties: {
+                        role: { type: 'string' },
+                        content: { type: 'string', nullable: true },
+                      },
+                    },
+                    finish_reason: { type: 'string' },
+                  },
+                },
+              },
+              usage: {
+                type: 'object',
+                properties: {
+                  prompt_tokens: { type: 'number' },
+                  completion_tokens: { type: 'number' },
+                  total_tokens: { type: 'number' },
+                },
+              },
+            },
+          },
+        },
+      },
+      sse: true,
+    },
     async (request: FastifyRequest<RequestBody>, reply: FastifyReply) => {
       const body = request.body;
 
@@ -53,7 +200,7 @@ export const chatCompletionsRoute: FastifyPluginAsync<RouteOptions> = async (
         });
 
         // Convert OpenAI messages to Gemini format
-        const { contents } = openaiToGemini(body.messages);
+        const { contents } = await openaiToGemini(body.messages);
 
         // Get the last user message content for streaming
         const lastUserContent = contents[contents.length - 1];

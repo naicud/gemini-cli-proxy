@@ -27,9 +27,12 @@
     "dist"
   ],
   "dependencies": {
+    "@fastify/cors": "^11.2.0",
+    "@fastify/sse": "^0.4.0",
+    "@fastify/swagger": "^9.6.1",
+    "@fastify/swagger-ui": "^5.2.4",
     "@google/gemini-cli-core": "file:../core",
     "fastify": "^5.2.2",
-    "@fastify/sse": "^0.4.0",
     "openai": "^4.104.0",
     "uuid": "^13.0.0"
   },

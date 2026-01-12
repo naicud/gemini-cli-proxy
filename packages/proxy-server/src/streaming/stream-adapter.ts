@@ -58,23 +58,6 @@ export async function* geminiToOpenAIStream(
   yield { data: '[DONE]' };
 }
 
-interface GeminiPart {
-  text?: string;
-  thought?: string;
-  functionCall?: {
-    name?: string;
-    args?: Record<string, unknown>;
-  };
-}
-
-interface GeminiContent {
-  candidates?: Array<{
-    content?: {
-      parts?: GeminiPart[];
-    };
-  }>;
-}
-
 function processEvent(
   event: ServerGeminiStreamEvent,
   id: string,
@@ -83,13 +66,6 @@ function processEvent(
   isFirstChunk: boolean,
   includeThinking: boolean,
 ): ChatCompletionChunk | null {
-  // Handle content events from Gemini
-  if (event.type !== 'content' || !event.value) {
-    return null;
-  }
-
-  const geminiContent = event.value as GeminiContent;
-  const parts = geminiContent.candidates?.[0]?.content?.parts ?? [];
   const delta: ChatCompletionChunkChoice['delta'] & {
     reasoning_content?: string;
   } = {};
@@ -98,31 +74,37 @@ function processEvent(
     delta.role = 'assistant';
   }
 
-  // Extract text content
-  for (const part of parts) {
-    if (part.text) {
-      delta.content = part.text;
-    }
+  // Handle content events - value is directly a string
+  if (event.type === 'content' && event.value) {
+    delta.content = event.value;
+  }
 
-    // Extract thinking/reasoning content (custom extension)
-    if (includeThinking && part.thought) {
-      delta.reasoning_content = part.thought;
+  // Handle thought events - value is ThoughtSummary with text property
+  if (includeThinking && event.type === 'thought' && event.value) {
+    const thought = event.value as { text?: string };
+    if (thought.text) {
+      delta.reasoning_content = thought.text;
     }
+  }
 
-    // Handle function calls
-    if (part.functionCall) {
-      delta.tool_calls = [
-        {
-          index: 0,
-          id: `call_${uuid()}`,
-          type: 'function',
-          function: {
-            name: part.functionCall.name ?? '',
-            arguments: JSON.stringify(part.functionCall.args ?? {}),
-          },
+  // Handle tool call request events
+  if (event.type === 'tool_call_request' && event.value) {
+    const toolCall = event.value as {
+      callId?: string;
+      name?: string;
+      args?: Record<string, unknown>;
+    };
+    delta.tool_calls = [
+      {
+        index: 0,
+        id: toolCall.callId ?? `call_${uuid()}`,
+        type: 'function',
+        function: {
+          name: toolCall.name ?? '',
+          arguments: JSON.stringify(toolCall.args ?? {}),
         },
-      ];
-    }
+      },
+    ];
   }
 
   // Only emit if we have content

@@ -4,15 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  GeminiClient} from '@google/gemini-cli-core';
-import {
-  Config,
-  AuthType,
-  createContentGenerator,
-  createContentGeneratorConfig,
-  ApprovalMode,
-} from '@google/gemini-cli-core';
+import type { GeminiClient } from '@google/gemini-cli-core';
+import { Config, AuthType, ApprovalMode } from '@google/gemini-cli-core';
 import { v4 as uuid } from 'uuid';
 
 interface SessionEntry {
@@ -48,12 +41,9 @@ export class SessionManager {
       approvalMode: ApprovalMode.YOLO, // Auto-approve all tools for API
     });
 
-    // Create content generator using core's auth system
-    const contentGenConfig = await createContentGeneratorConfig(
-      config,
-      authType,
-    );
-    await createContentGenerator(contentGenConfig, config);
+    // Initialize content generator and auth system using refreshAuth
+    // This properly sets the content generator on the config object
+    await config.refreshAuth(authType);
 
     // Initialize config (this sets up tools, clients, etc.)
     await config.initialize();

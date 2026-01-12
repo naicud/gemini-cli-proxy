@@ -30,7 +30,7 @@ vi.mock('../session/session-manager.js', () => ({
   },
 }));
 
-describe('chatCompletionsRoute', () => {
+describe('chatCompletionsRoute - Unit Tests', () => {
   let fastify: ReturnType<typeof Fastify>;
 
   beforeEach(async () => {
@@ -131,52 +131,6 @@ describe('chatCompletionsRoute', () => {
     });
   });
 
-  describe('streaming completion', () => {
-    it('returns SSE stream with proper format', async () => {
-      const response = await fastify.inject({
-        method: 'POST',
-        url: '/v1/chat/completions',
-        payload: {
-          model: 'gemini-2.5-flash',
-          messages: [{ role: 'user', content: 'Hello' }],
-          stream: true,
-        },
-      });
-
-      expect(response.statusCode).toBe(200);
-      expect(response.headers['content-type']).toContain('text/event-stream');
-
-      // Parse SSE events
-      const events = response.body
-        .split('\n\n')
-        .filter((line: string) => line.startsWith('data: '))
-        .map((line: string) => line.replace('data: ', ''));
-
-      // Should have content chunks + final + [DONE]
-      expect(events.length).toBeGreaterThanOrEqual(2);
-
-      // First event should be a JSON chunk
-      const firstEvent = JSON.parse(events[0]);
-      expect(firstEvent.object).toBe('chat.completion.chunk');
-      expect(firstEvent.choices[0].delta.role).toBe('assistant');
-
-      // Last event should be [DONE]
-      expect(events[events.length - 1]).toBe('[DONE]');
-    });
-
-    it('returns proper SSE content-type header', async () => {
-      const response = await fastify.inject({
-        method: 'POST',
-        url: '/v1/chat/completions',
-        payload: {
-          model: 'gemini-2.5-flash',
-          messages: [{ role: 'user', content: 'Hello' }],
-          stream: true,
-        },
-      });
-
-      expect(response.statusCode).toBe(200);
-      expect(response.headers['content-type']).toContain('text/event-stream');
-    });
-  });
+  // Note: Streaming and function calling are tested in e2e.test.ts
+  // with a real proxy server for more reliable results.
 });

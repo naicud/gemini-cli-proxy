@@ -1,0 +1,18 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+export interface ServerConfig {
+  readonly port: number;
+  readonly host: string;
+  readonly workingDirectory: string;
+}
+
+export interface StreamEvent {
+  readonly id?: string;
+  readonly event?: string;
+  readonly data: unknown;
+  readonly retry?: number;
+}

@@ -88,6 +88,54 @@
       "env": {
         "GEMINI_SANDBOX": "false"
       }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Launch Proxy Server",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx", "src/server.ts"],
+      "cwd": "${workspaceFolder}/packages/proxy-server",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"],
+      "env": {
+        "PORT": "3000",
+        "HOST": "127.0.0.1",
+        "INCLUDE_THINKING": "true"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Proxy Server Tests",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vitest",
+        "run",
+        "--reporter=verbose",
+        "--inspect-brk=9229"
+      ],
+      "cwd": "${workspaceFolder}/packages/proxy-server",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Proxy Server Test File",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vitest",
+        "run",
+        "--reporter=verbose",
+        "--inspect-brk=9229",
+        "${file}"
+      ],
+      "cwd": "${workspaceFolder}/packages/proxy-server",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": ["<node_internals>/**"]
     }
   ],
   "inputs": [

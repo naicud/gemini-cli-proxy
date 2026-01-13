@@ -113,6 +113,25 @@ function processEvent(
     }
   }
 
+  // Handle finished event to map finish_reason correctly
+  let finishReason: OpenAI.ChatCompletionChunk.Choice['finish_reason'] = null;
+  if (event.type === 'finished') {
+    const geminiReason = event.value.reason;
+    if (geminiReason === 'STOP') {
+      finishReason = 'stop';
+    } else if (geminiReason === 'MAX_TOKENS') {
+      finishReason = 'length';
+    } else if (
+      geminiReason === 'SAFETY' ||
+      geminiReason === 'RECITATION' ||
+      geminiReason === 'OTHER'
+    ) {
+      finishReason = 'content_filter';
+    } else {
+      finishReason = 'stop'; // Default fallback
+    }
+  }
+
   // Handle tool call request events
   if (event.type === 'tool_call_request' && event.value) {
     const toolCall = event.value as {
@@ -148,8 +167,11 @@ function processEvent(
       choices: [
         {
           index: 0,
-          delta,
-          finish_reason: null,
+          delta: {
+            ...delta,
+            refusal: delta.refusal ?? null,
+          } as OpenAI.ChatCompletionChunk.Choice.Delta,
+          finish_reason: finishReason,
           logprobs: null,
         },
       ],

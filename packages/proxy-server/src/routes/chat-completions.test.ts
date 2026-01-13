@@ -98,6 +98,60 @@ describe('chatCompletionsRoute - Unit Tests', () => {
 
       expect(response.statusCode).toBe(400);
     });
+
+    it('accepts assistant message with null content and tool_calls', async () => {
+      const response = await fastify.inject({
+        method: 'POST',
+        url: '/v1/chat/completions',
+        payload: {
+          model: 'gemini-2.5-flash',
+          messages: [
+            { role: 'user', content: 'What is the weather?' },
+            {
+              role: 'assistant',
+              content: null,
+              tool_calls: [
+                {
+                  id: 'call_123',
+                  type: 'function',
+                  function: { name: 'get_weather', arguments: '{}' },
+                },
+              ],
+            },
+            { role: 'tool', tool_call_id: 'call_123', content: '{"temp": 20}' },
+            { role: 'user', content: 'Thanks!' },
+          ],
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+    });
+
+    it('accepts multimodal user message with image_url', async () => {
+      const base64Data =
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+      const response = await fastify.inject({
+        method: 'POST',
+        url: '/v1/chat/completions',
+        payload: {
+          model: 'gemini-2.5-flash',
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: 'What is in this image?' },
+                {
+                  type: 'image_url',
+                  image_url: { url: `data:image/png;base64,${base64Data}` },
+                },
+              ],
+            },
+          ],
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+    });
   });
 
   describe('non-streaming completion', () => {

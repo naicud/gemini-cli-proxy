@@ -22,6 +22,7 @@ export async function createServer(
 ): Promise<FastifyInstance> {
   const fastify = Fastify({
     logger: true,
+    bodyLimit: 52428800, // 50MB - supports large base64 image payloads
   });
 
   // Register Logger Plugin (Custom request/response logging)

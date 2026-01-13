@@ -12,7 +12,29 @@ import type { FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
 
 const loggerPluginCallback: FastifyPluginAsync = async (fastify) => {
-  // Log Request Body
+  // Log raw request body BEFORE validation (for debugging validation errors)
+  fastify.addHook('preParsing', async (request, _reply, payload) => {
+    // Collect raw body for logging
+    const chunks: Buffer[] = [];
+    for await (const chunk of payload) {
+      chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+    }
+    const rawBody = Buffer.concat(chunks).toString('utf-8');
+
+    // Log raw body with JSON pretty-print if possible
+    try {
+      const parsed = JSON.parse(rawBody);
+      request.log.info({ rawBody: parsed }, 'Raw Request Body (preParsing)');
+    } catch {
+      request.log.debug({ rawBody }, 'Raw Request Body (preParsing)');
+    }
+
+    // Return a new readable stream since we consumed the original
+    const { Readable } = await import('node:stream');
+    return Readable.from([rawBody]);
+  });
+
+  // Log Request Body (after parsing and validation)
   fastify.addHook('preHandler', async (request) => {
     // console.log('DEBUG: preHandler running', request.body);
     if (request.body) {

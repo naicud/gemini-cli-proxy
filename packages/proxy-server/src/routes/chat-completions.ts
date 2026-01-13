@@ -42,108 +42,8 @@ export const chatCompletionsRoute: FastifyPluginAsync<RouteOptions> = async (
         description:
           'Creates a model response for the given chat conversation.',
         tags: ['chat'],
-        body: {
-          type: 'object',
-          required: ['messages', 'model'],
-          properties: {
-            model: {
-              type: 'string',
-              description: 'ID of the model to use.',
-              enum: [
-                'gemini-2.5-pro',
-                'gemini-2.5-flash',
-                'gemini-2.5-flash-lite',
-                'gemini-3-pro-preview',
-                'gemini-3-flash-preview',
-                'auto',
-              ],
-            },
-            messages: {
-              type: 'array',
-              description:
-                'A list of messages comprising the conversation so far.',
-              items: {
-                type: 'object',
-                required: ['role', 'content'],
-                properties: {
-                  role: {
-                    type: 'string',
-                    enum: ['system', 'user', 'assistant', 'tool'],
-                  },
-                  content: {
-                    anyOf: [
-                      { type: 'string' },
-                      {
-                        type: 'array',
-                        items: {
-                          anyOf: [
-                            {
-                              type: 'object',
-                              properties: {
-                                type: { type: 'string', const: 'text' },
-                                text: { type: 'string' },
-                              },
-                              required: ['type', 'text'],
-                            },
-                            {
-                              type: 'object',
-                              properties: {
-                                type: { type: 'string', const: 'image_url' },
-                                image_url: {
-                                  type: 'object',
-                                  properties: {
-                                    url: {
-                                      type: 'string',
-                                      description:
-                                        'URL or base64 data URL (data:image/jpeg;base64,...)',
-                                    },
-                                    detail: {
-                                      type: 'string',
-                                      enum: ['auto', 'low', 'high'],
-                                      description:
-                                        'Image detail level (defaults to auto)',
-                                    },
-                                  },
-                                  required: ['url'],
-                                },
-                              },
-                              required: ['type', 'image_url'],
-                            },
-                          ],
-                        },
-                      },
-                    ],
-                  },
-                  name: { type: 'string' },
-                  tool_call_id: { type: 'string' },
-                },
-              },
-            },
-            stream: { type: 'boolean', default: false },
-            temperature: { type: 'number', minimum: 0, maximum: 2, default: 1 },
-            top_p: { type: 'number', minimum: 0, maximum: 1, default: 1 },
-            max_tokens: { type: 'integer' },
-            max_completion_tokens: { type: 'integer' },
-            presence_penalty: {
-              type: 'number',
-              minimum: -2,
-              maximum: 2,
-              default: 0,
-            },
-            frequency_penalty: {
-              type: 'number',
-              minimum: -2,
-              maximum: 2,
-              default: 0,
-            },
-            stop: {
-              anyOf: [
-                { type: 'string' },
-                { type: 'array', items: { type: 'string' } },
-              ],
-            },
-          },
-        },
+        // No body schema validation - OpenAI clients send various formats
+        // Validation is handled by the route handler and message converter
         response: {
           200: {
             description: 'Successful response',
@@ -195,6 +95,16 @@ export const chatCompletionsRoute: FastifyPluginAsync<RouteOptions> = async (
             message: 'messages is required and must not be empty',
             type: 'invalid_request_error',
             code: 'invalid_messages',
+          },
+        });
+      }
+
+      if (!body.model) {
+        return reply.status(400).send({
+          error: {
+            message: 'model is required',
+            type: 'invalid_request_error',
+            code: 'invalid_model',
           },
         });
       }
@@ -398,27 +308,53 @@ function buildNonStreamingResponse(
   chunks: OpenAI.ChatCompletionChunk[],
   model: string,
   usage?: OpenAI.CompletionUsage,
-): ChatCompletion & {
-  choices: Array<{ message: { reasoning_content?: string | null } }>;
-} {
-  const content = chunks
-    .map((c) => c.choices[0]?.delta?.content ?? '')
-    .join('');
+): ChatCompletion {
+  // Aggregated content from chunks
+  let content = '';
+  let reasoningContent = '';
+  const toolCalls: OpenAI.ChatCompletionMessageToolCall[] = [];
 
-  // Collect reasoning content from chunks
-  const reasoningContent = chunks
-    .map(
-      (c) =>
-        (c.choices[0]?.delta as { reasoning_content?: string })
-          ?.reasoning_content ?? '',
-    )
-    .join('');
+  for (const chunk of chunks) {
+    const delta = chunk.choices[0]?.delta;
+    if (delta) {
+      if (delta.content) content += delta.content;
+      if (
+        (
+          delta as OpenAI.ChatCompletionChunk.Choice.Delta & {
+            reasoning_content?: string;
+          }
+        ).reasoning_content
+      ) {
+        reasoningContent += (
+          delta as OpenAI.ChatCompletionChunk.Choice.Delta & {
+            reasoning_content?: string;
+          }
+        ).reasoning_content!;
+      }
+      if (delta.tool_calls) {
+        for (const tc of delta.tool_calls) {
+          if (tc.index !== undefined) {
+            // Reconstruct tool calls based on index
+            if (!toolCalls[tc.index]) {
+              toolCalls[tc.index] = {
+                id: tc.id ?? `call_${uuid()}`,
+                type: 'function',
+                function: { name: '', arguments: '' },
+              };
+            }
+            if (tc.function?.name)
+              toolCalls[tc.index].function.name += tc.function.name;
+            if (tc.function?.arguments)
+              toolCalls[tc.index].function.arguments += tc.function.arguments;
+          }
+        }
+      }
+    }
+  }
 
-  const toolCalls = chunks
-    .flatMap((c) => c.choices[0]?.delta?.tool_calls ?? [])
-    .filter(
-      (tc): tc is OpenAI.ChatCompletionChunk.Choice.Delta.ToolCall => !!tc,
-    );
+  const finishReason =
+    chunks.find((c) => c.choices[0]?.finish_reason)?.choices[0]
+      ?.finish_reason ?? 'stop';
 
   return {
     id: chunks[0]?.id ?? `chatcmpl-${uuid()}`,
@@ -433,19 +369,11 @@ function buildNonStreamingResponse(
           content: content || null,
           reasoning_content: reasoningContent || undefined,
           tool_calls:
-            toolCalls.length > 0
-              ? toolCalls.map((tc) => ({
-                  id: tc.id ?? `call_${uuid()}`,
-                  type: 'function' as const,
-                  function: {
-                    name: tc.function?.name ?? '',
-                    arguments: tc.function?.arguments ?? '{}',
-                  },
-                }))
-              : undefined,
+            toolCalls.length > 0 ? toolCalls.filter(Boolean) : undefined,
           refusal: null,
-        },
-        finish_reason: 'stop',
+        } as OpenAI.ChatCompletionMessage,
+        finish_reason:
+          finishReason,
         logprobs: null,
       },
     ],
